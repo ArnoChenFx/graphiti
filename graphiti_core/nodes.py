@@ -86,7 +86,7 @@ class Node(BaseModel, ABC):
             uuid=self.uuid,
         )
 
-        logger.info(f'Deleted Node: {self.uuid}')
+        logger.debug(f'Deleted Node: {self.uuid}')
 
         return result
 
@@ -135,7 +135,7 @@ class EpisodicNode(Node):
             source=self.source.value,
         )
 
-        logger.info(f'Saved Node to neo4j: {self.uuid}')
+        logger.debug(f'Saved Node to neo4j: {self.uuid}')
 
         return result
 
@@ -217,7 +217,7 @@ class EntityNode(Node):
         text = self.name.replace('\n', ' ')
         self.name_embedding = await embedder.create(input=[text])
         end = time()
-        logger.info(f'embedded {text} in {end - start} ms')
+        logger.debug(f'embedded {text} in {end - start} ms')
 
         return self.name_embedding
 
@@ -236,7 +236,7 @@ class EntityNode(Node):
             created_at=self.created_at,
         )
 
-        logger.info(f'Saved Node to neo4j: {self.uuid}')
+        logger.debug(f'Saved Node to neo4j: {self.uuid}')
 
         return result
 
@@ -257,6 +257,9 @@ class EntityNode(Node):
         )
 
         nodes = [get_entity_node_from_record(record) for record in records]
+
+        if len(nodes) == 0:
+            raise NodeNotFoundError(uuid)
 
         return nodes[0]
 
@@ -320,7 +323,7 @@ class CommunityNode(Node):
             created_at=self.created_at,
         )
 
-        logger.info(f'Saved Node to neo4j: {self.uuid}')
+        logger.debug(f'Saved Node to neo4j: {self.uuid}')
 
         return result
 
@@ -329,7 +332,7 @@ class CommunityNode(Node):
         text = self.name.replace('\n', ' ')
         self.name_embedding = await embedder.create(input=[text])
         end = time()
-        logger.info(f'embedded {text} in {end - start} ms')
+        logger.debug(f'embedded {text} in {end - start} ms')
 
         return self.name_embedding
 
@@ -350,6 +353,9 @@ class CommunityNode(Node):
         )
 
         nodes = [get_community_node_from_record(record) for record in records]
+
+        if len(nodes) == 0:
+            raise NodeNotFoundError(uuid)
 
         return nodes[0]
 
