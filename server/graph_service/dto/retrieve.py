@@ -1,10 +1,10 @@
 from datetime import datetime, timezone
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
 from graph_service.dto.common import Message
 
-from typing import Optional, Literal
 
 class SearchQuery(BaseModel):
     group_ids: list[str] | None = Field(

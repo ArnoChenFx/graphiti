@@ -18,11 +18,11 @@ import asyncio
 import logging
 from datetime import datetime
 from time import time
+from typing import Literal, Optional
 
 from dotenv import load_dotenv
 from neo4j import AsyncGraphDatabase
 from pydantic import BaseModel
-from typing import Optional, Literal
 
 from graphiti_core.edges import EntityEdge, EpisodicEdge
 from graphiti_core.embedder import EmbedderClient, OpenAIEmbedder
@@ -31,9 +31,9 @@ from graphiti_core.nodes import CommunityNode, EntityNode, EpisodeType, Episodic
 from graphiti_core.search.search import SearchConfig, search
 from graphiti_core.search.search_config import DEFAULT_SEARCH_LIMIT, SearchResults
 from graphiti_core.search.search_config_recipes import (
+    EDGE_HYBRID_SEARCH_MMR,
     EDGE_HYBRID_SEARCH_NODE_DISTANCE,
     EDGE_HYBRID_SEARCH_RRF,
-    EDGE_HYBRID_SEARCH_MMR,
     NODE_HYBRID_SEARCH_NODE_DISTANCE,
     NODE_HYBRID_SEARCH_RRF,
 )
