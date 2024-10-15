@@ -22,6 +22,7 @@ from time import time
 from dotenv import load_dotenv
 from neo4j import AsyncGraphDatabase
 from pydantic import BaseModel
+from typing import Optional, Literal
 
 from graphiti_core.edges import EntityEdge, EpisodicEdge
 from graphiti_core.embedder import EmbedderClient, OpenAIEmbedder
@@ -32,6 +33,7 @@ from graphiti_core.search.search_config import DEFAULT_SEARCH_LIMIT, SearchResul
 from graphiti_core.search.search_config_recipes import (
     EDGE_HYBRID_SEARCH_NODE_DISTANCE,
     EDGE_HYBRID_SEARCH_RRF,
+    EDGE_HYBRID_SEARCH_MMR,
     NODE_HYBRID_SEARCH_NODE_DISTANCE,
     NODE_HYBRID_SEARCH_RRF,
 )
@@ -606,7 +608,10 @@ class Graphiti:
         center_node_uuid: str | None = None,
         group_ids: list[str] | None = None,
         num_results=DEFAULT_SEARCH_LIMIT,
-    ) -> list[EntityEdge]:
+        search_type:  Literal["similarity", "mmr"] = "similarity",
+        min_score: Optional[float] = None,
+        mmr_lambda: Optional[float] = None,
+    ) -> SearchResults:
         """
         Perform a hybrid search on the knowledge graph.
 
@@ -623,7 +628,11 @@ class Graphiti:
             The graph partitions to return data from.
         num_results : int, optional
             The maximum number of results to return. Defaults to 10.
-
+        search_type : str
+        min_score : float, optional
+            The minimum score for search results.
+        mmr_lambda : float, optional
+            The lambda parameter for the MMR Reranking Algorithm.
         Returns
         -------
         list
@@ -638,10 +647,22 @@ class Graphiti:
         The search is performed using the current date and time as the reference
         point for temporal relevance.
         """
-        search_config = (
-            EDGE_HYBRID_SEARCH_RRF if center_node_uuid is None else EDGE_HYBRID_SEARCH_NODE_DISTANCE
-        )
+
+        if center_node_uuid:
+            search_config = EDGE_HYBRID_SEARCH_NODE_DISTANCE.model_copy()
+        else:
+            if search_type == 'mmr':
+                search_config = EDGE_HYBRID_SEARCH_MMR.model_copy()
+            else:
+                search_config = EDGE_HYBRID_SEARCH_RRF.model_copy()
+
         search_config.limit = num_results
+        
+        if min_score:
+            search_config.edge_config.sim_min_score = min_score
+
+        if mmr_lambda:
+            search_config.edge_config.mmr_lambda = mmr_lambda
 
         edges = (
             await search(

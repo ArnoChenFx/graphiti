@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 from graph_service.dto.common import Message
 
+from typing import Optional, Literal
 
 class SearchQuery(BaseModel):
     group_ids: list[str] | None = Field(
@@ -11,6 +12,10 @@ class SearchQuery(BaseModel):
     )
     query: str
     max_facts: int = Field(default=10, description='The maximum number of facts to retrieve')
+
+    min_score: Optional[float] = Field(default=None)
+    mmr_lambda: Optional[float] = Field(default=None)
+    search_type:  Optional[Literal["similarity", "mmr"]] = Field(default=None)
 
 
 class FactResult(BaseModel):
