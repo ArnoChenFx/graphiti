@@ -658,10 +658,10 @@ class Graphiti:
 
         search_config.limit = num_results
         
-        if min_score:
+        if min_score and search_config.edge_config:
             search_config.edge_config.sim_min_score = min_score
 
-        if mmr_lambda:
+        if mmr_lambda and search_config.edge_config:
             search_config.edge_config.mmr_lambda = mmr_lambda
 
         edges = (
