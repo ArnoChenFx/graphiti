@@ -62,6 +62,8 @@ async def search(
 ) -> SearchResults:
     start = time()
     query = query.replace('\n', ' ')
+    query_vector = await embedder.create(input=[query])
+    
     # if group_ids is empty, set it to None
     group_ids = group_ids if group_ids else None
     edges, nodes, communities = await asyncio.gather(
@@ -73,6 +75,7 @@ async def search(
             config.edge_config,
             center_node_uuid,
             config.limit,
+            query_vector,
         ),
         node_search(
             driver,
@@ -82,6 +85,7 @@ async def search(
             config.node_config,
             center_node_uuid,
             config.limit,
+            query_vector,
         ),
         community_search(
             driver,
@@ -90,6 +94,7 @@ async def search(
             group_ids,
             config.community_config,
             config.limit,
+            query_vector,
         ),
     )
 
@@ -114,11 +119,13 @@ async def edge_search(
     config: EdgeSearchConfig | None,
     center_node_uuid: str | None = None,
     limit=DEFAULT_SEARCH_LIMIT,
+    query_vector: list[float] = None,
 ) -> list[EntityEdge]:
     if config is None:
         return []
-
-    query_vector = await embedder.create(input=[query])
+    
+    if not query_vector:
+        query_vector = await embedder.create(input=[query])
 
     search_results: list[list[EntityEdge]] = list(
         await asyncio.gather(
@@ -183,11 +190,13 @@ async def node_search(
     config: NodeSearchConfig | None,
     center_node_uuid: str | None = None,
     limit=DEFAULT_SEARCH_LIMIT,
+    query_vector: list[float] = None,
 ) -> list[EntityNode]:
     if config is None:
         return []
 
-    query_vector = await embedder.create(input=[query])
+    if not query_vector:
+        query_vector = await embedder.create(input=[query])
 
     search_results: list[list[EntityNode]] = list(
         await asyncio.gather(
@@ -236,11 +245,13 @@ async def community_search(
     group_ids: list[str] | None,
     config: CommunitySearchConfig | None,
     limit=DEFAULT_SEARCH_LIMIT,
+    query_vector: list[float] = None,
 ) -> list[CommunityNode]:
     if config is None:
         return []
-
-    query_vector = await embedder.create(input=[query])
+    
+    if not query_vector:
+        query_vector = await embedder.create(input=[query])
 
     search_results: list[list[CommunityNode]] = list(
         await asyncio.gather(
