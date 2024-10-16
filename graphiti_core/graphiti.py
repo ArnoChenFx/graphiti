@@ -612,6 +612,7 @@ class Graphiti:
         search_type:  Literal["similarity", "mmr"] = "similarity",
         min_score: Optional[float] = None,
         mmr_lambda: Optional[float] = None,
+        query_embedding: Optional[list[float]] = None,
     ) -> SearchResults:
         """
         Perform a hybrid search on the knowledge graph.
@@ -673,6 +674,7 @@ class Graphiti:
                 group_ids,
                 search_config,
                 center_node_uuid,
+                query_embedding,
             )
         ).edges
 

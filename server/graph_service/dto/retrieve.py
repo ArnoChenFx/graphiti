@@ -16,6 +16,7 @@ class SearchQuery(BaseModel):
     min_score: Optional[float] = Field(default=None)
     mmr_lambda: Optional[float] = Field(default=None)
     search_type:  Optional[Literal["similarity", "mmr"]] = Field(default=None)
+    query_embedding:  Optional[list[float]] = Field(default=None)
 
 
 class FactResult(BaseModel):

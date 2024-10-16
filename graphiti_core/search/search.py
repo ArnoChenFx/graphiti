@@ -59,10 +59,13 @@ async def search(
     group_ids: list[str] | None,
     config: SearchConfig,
     center_node_uuid: str | None = None,
+    query_embedding: list[float] | None = None,
 ) -> SearchResults:
     start = time()
     query = query.replace('\n', ' ')
-    query_vector = await embedder.create(input=[query])
+
+    if not query_embedding or not isinstance(query_embedding, list):
+        query_embedding = await embedder.create(input=[query])
     
     # if group_ids is empty, set it to None
     group_ids = group_ids if group_ids else None
@@ -75,7 +78,7 @@ async def search(
             config.edge_config,
             center_node_uuid,
             config.limit,
-            query_vector,
+            query_embedding,
         ),
         node_search(
             driver,
@@ -85,7 +88,7 @@ async def search(
             config.node_config,
             center_node_uuid,
             config.limit,
-            query_vector,
+            query_embedding,
         ),
         community_search(
             driver,
@@ -94,7 +97,7 @@ async def search(
             group_ids,
             config.community_config,
             config.limit,
-            query_vector,
+            query_embedding,
         ),
     )
 
