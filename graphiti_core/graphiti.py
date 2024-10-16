@@ -321,8 +321,6 @@ class Graphiti:
                 valid_at=reference_time,
             )
             episode.uuid = uuid if uuid is not None else episode.uuid
-            if not self.store_raw_episode_content:
-                episode.content = ''
 
             # Extract entities as nodes
 
@@ -444,6 +442,9 @@ class Graphiti:
             episode.entity_edges = [edge.uuid for edge in entity_edges]
 
             # Future optimization would be using batch operations to save nodes and edges
+            if not self.store_raw_episode_content:
+                episode.content = ''
+
             await episode.save(self.driver)
             await asyncio.gather(*[node.save(self.driver) for node in nodes])
             await asyncio.gather(*[edge.save(self.driver) for edge in episodic_edges])
