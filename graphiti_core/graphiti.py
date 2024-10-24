@@ -613,7 +613,7 @@ class Graphiti:
         min_score: Optional[float] = None,
         mmr_lambda: Optional[float] = None,
         query_vector: Optional[list[float]] = None,
-    ) -> SearchResults:
+    ) -> list[EntityEdge]:
         """
         Perform a hybrid search on the knowledge graph.
 
