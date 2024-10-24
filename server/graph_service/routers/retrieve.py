@@ -23,7 +23,7 @@ async def search(query: SearchQuery, graphiti: ZepGraphitiDep):
         search_type=query.search_type or 'similarity',
         min_score=query.min_score,
         mmr_lambda=query.mmr_lambda,
-        query_embedding=query.query_embedding,
+        query_vector=query.query_embedding,
     )
     facts = [get_fact_result_from_edge(edge) for edge in relevant_edges]
     return SearchResults(

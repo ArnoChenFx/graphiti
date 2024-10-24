@@ -59,45 +59,41 @@ async def search(
     group_ids: list[str] | None,
     config: SearchConfig,
     center_node_uuid: str | None = None,
-    query_embedding: list[float] | None = None,
+    query_vector: list[float] | None = None,
 ) -> SearchResults:
     start = time()
-    query = query.replace('\n', ' ')
 
-    if not query_embedding or not isinstance(query_embedding, list):
-        query_embedding = await embedder.create(input=[query])
+    if not query_vector or not isinstance(query_vector, list):
+        query_vector = await embedder.create(input=[query.replace('\n', ' ')])
     
     # if group_ids is empty, set it to None
     group_ids = group_ids if group_ids else None
     edges, nodes, communities = await asyncio.gather(
         edge_search(
             driver,
-            embedder,
             query,
+            query_vector,
             group_ids,
             config.edge_config,
             center_node_uuid,
             config.limit,
-            query_embedding,
         ),
         node_search(
             driver,
-            embedder,
             query,
+            query_vector,
             group_ids,
             config.node_config,
             center_node_uuid,
             config.limit,
-            query_embedding,
         ),
         community_search(
             driver,
-            embedder,
             query,
+            query_vector,
             group_ids,
             config.community_config,
             config.limit,
-            query_embedding,
         ),
     )
 
@@ -107,28 +103,24 @@ async def search(
         communities=communities,
     )
 
-    end = time()
+    latency = (time() - start) * 1000
 
-    logger.info(f'search returned context for query {query} in {(end - start) * 1000} ms')
+    logger.debug(f'search returned context for query {query} in {latency} ms')
 
     return results
 
 
 async def edge_search(
-    driver: AsyncDriver,
-    embedder: EmbedderClient,
-    query: str,
-    group_ids: list[str] | None,
-    config: EdgeSearchConfig | None,
-    center_node_uuid: str | None = None,
-    limit=DEFAULT_SEARCH_LIMIT,
-    query_vector: list[float] = None,
+        driver: AsyncDriver,
+        query: str,
+        query_vector: list[float],
+        group_ids: list[str] | None,
+        config: EdgeSearchConfig | None,
+        center_node_uuid: str | None = None,
+        limit=DEFAULT_SEARCH_LIMIT,
 ) -> list[EntityEdge]:
     if config is None:
         return []
-    
-    if not query_vector:
-        query_vector = await embedder.create(input=[query])
 
     search_results: list[list[EntityEdge]] = list(
         await asyncio.gather(
@@ -186,20 +178,16 @@ async def edge_search(
 
 
 async def node_search(
-    driver: AsyncDriver,
-    embedder: EmbedderClient,
-    query: str,
-    group_ids: list[str] | None,
-    config: NodeSearchConfig | None,
-    center_node_uuid: str | None = None,
-    limit=DEFAULT_SEARCH_LIMIT,
-    query_vector: list[float] = None,
+        driver: AsyncDriver,
+        query: str,
+        query_vector: list[float],
+        group_ids: list[str] | None,
+        config: NodeSearchConfig | None,
+        center_node_uuid: str | None = None,
+        limit=DEFAULT_SEARCH_LIMIT,
 ) -> list[EntityNode]:
     if config is None:
         return []
-
-    if not query_vector:
-        query_vector = await embedder.create(input=[query])
 
     search_results: list[list[EntityNode]] = list(
         await asyncio.gather(
@@ -242,19 +230,15 @@ async def node_search(
 
 
 async def community_search(
-    driver: AsyncDriver,
-    embedder: EmbedderClient,
-    query: str,
-    group_ids: list[str] | None,
-    config: CommunitySearchConfig | None,
-    limit=DEFAULT_SEARCH_LIMIT,
-    query_vector: list[float] = None,
+        driver: AsyncDriver,
+        query: str,
+        query_vector: list[float],
+        group_ids: list[str] | None,
+        config: CommunitySearchConfig | None,
+        limit=DEFAULT_SEARCH_LIMIT,
 ) -> list[CommunityNode]:
     if config is None:
         return []
-    
-    if not query_vector:
-        query_vector = await embedder.create(input=[query])
 
     search_results: list[list[CommunityNode]] = list(
         await asyncio.gather(
