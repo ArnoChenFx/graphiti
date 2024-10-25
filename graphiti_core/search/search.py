@@ -111,13 +111,13 @@ async def search(
 
 
 async def edge_search(
-        driver: AsyncDriver,
-        query: str,
-        query_vector: list[float],
-        group_ids: list[str] | None,
-        config: EdgeSearchConfig | None,
-        center_node_uuid: str | None = None,
-        limit=DEFAULT_SEARCH_LIMIT,
+    driver: AsyncDriver,
+    query: str,
+    query_vector: list[float],
+    group_ids: list[str] | None,
+    config: EdgeSearchConfig | None,
+    center_node_uuid: str | None = None,
+    limit=DEFAULT_SEARCH_LIMIT,
 ) -> list[EntityEdge]:
     if config is None:
         return []
@@ -178,13 +178,13 @@ async def edge_search(
 
 
 async def node_search(
-        driver: AsyncDriver,
-        query: str,
-        query_vector: list[float],
-        group_ids: list[str] | None,
-        config: NodeSearchConfig | None,
-        center_node_uuid: str | None = None,
-        limit=DEFAULT_SEARCH_LIMIT,
+    driver: AsyncDriver,
+    query: str,
+    query_vector: list[float],
+    group_ids: list[str] | None,
+    config: NodeSearchConfig | None,
+    center_node_uuid: str | None = None,
+    limit=DEFAULT_SEARCH_LIMIT,
 ) -> list[EntityNode]:
     if config is None:
         return []
@@ -230,12 +230,12 @@ async def node_search(
 
 
 async def community_search(
-        driver: AsyncDriver,
-        query: str,
-        query_vector: list[float],
-        group_ids: list[str] | None,
-        config: CommunitySearchConfig | None,
-        limit=DEFAULT_SEARCH_LIMIT,
+    driver: AsyncDriver,
+    query: str,
+    query_vector: list[float],
+    group_ids: list[str] | None,
+    config: CommunitySearchConfig | None,
+    limit=DEFAULT_SEARCH_LIMIT,
 ) -> list[CommunityNode]:
     if config is None:
         return []
