@@ -69,8 +69,8 @@ async def search(
     start = time()
 
     if not query_vector or not isinstance(query_vector, list):
-        query_vector = await embedder.create(input=[query.replace('\n', ' ')])
-    
+        query_vector = await embedder.create(input_data=[query.replace('\n', ' ')])
+
     # if group_ids is empty, set it to None
     group_ids = group_ids if group_ids else None
     edges, nodes, communities = await asyncio.gather(
