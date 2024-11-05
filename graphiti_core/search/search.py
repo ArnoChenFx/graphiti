@@ -67,7 +67,12 @@ async def search(
     query_vector: list[float] | None = None,
 ) -> SearchResults:
     start = time()
-
+    if query.strip() == '':
+        return SearchResults(
+            edges=[],
+            nodes=[],
+            communities=[],
+        )
     if not query_vector or not isinstance(query_vector, list):
         query_vector = await embedder.create(input_data=[query.replace('\n', ' ')])
 
