@@ -17,7 +17,19 @@ limitations under the License.
 import json
 from typing import Any, Protocol, TypedDict
 
+from pydantic import BaseModel, Field
+
 from .models import Message, PromptFunction, PromptVersion
+
+
+class Summary(BaseModel):
+    summary: str = Field(
+        ..., description='Summary containing the important information from both summaries'
+    )
+
+
+class SummaryDescription(BaseModel):
+    description: str = Field(..., description='One sentence description of the provided summary')
 
 
 class Prompt(Protocol):
@@ -42,14 +54,11 @@ def summarize_pair(context: dict[str, Any]) -> list[Message]:
             role='user',
             content=f"""
         Synthesize the information from the following two summaries into a single succinct summary.
+        
+        Summaries must be under 500 words.
 
         Summaries:
         {json.dumps(context['node_summaries'], indent=2)}
-
-        Respond with a JSON object in the following format:
-            {{
-                "summary": "Summary containing the important information from both summaries"
-            }}
         """,
         ),
     ]
@@ -74,15 +83,11 @@ def summarize_context(context: dict[str, Any]) -> list[Message]:
         information from the provided MESSAGES. Your summary should also only contain information relevant to the
         provided ENTITY.
         
+        Summaries must be under 500 words.
+        
         <ENTITY>
         {context['node_name']}
         </ENTITY>
-        
-
-        Respond with a JSON object in the following format:
-            {{
-                "summary": "Entity summary"
-            }}
         """,
         ),
     ]
@@ -98,14 +103,10 @@ def summary_description(context: dict[str, Any]) -> list[Message]:
             role='user',
             content=f"""
         Create a short one sentence description of the summary that explains what kind of information is summarized.
+        Summaries must be under 500 words.
 
         Summary:
         {json.dumps(context['summary'], indent=2)}
-
-        Respond with a JSON object in the following format:
-            {{
-                "description": "One sentence description of the provided summary"
-            }}
         """,
         ),
     ]
