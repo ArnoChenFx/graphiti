@@ -14,9 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from time import time
 from typing import Literal, Optional
 
@@ -28,7 +27,7 @@ from graphiti_core.cross_encoder.client import CrossEncoderClient
 from graphiti_core.cross_encoder.openai_reranker_client import OpenAIRerankerClient
 from graphiti_core.edges import EntityEdge, EpisodicEdge
 from graphiti_core.embedder import EmbedderClient, OpenAIEmbedder
-from graphiti_core.helpers import DEFAULT_DATABASE
+from graphiti_core.helpers import DEFAULT_DATABASE, semaphore_gather
 from graphiti_core.llm_client import LLMClient, OpenAIClient
 from graphiti_core.nodes import CommunityNode, EntityNode, EpisodeType, EpisodicNode
 from graphiti_core.search.search import SearchConfig, search
@@ -45,10 +44,6 @@ from graphiti_core.search.search_utils import (
     get_relevant_edges,
     get_relevant_nodes,
 )
-from graphiti_core.utils import (
-    build_episodic_edges,
-    retrieve_episodes,
-)
 from graphiti_core.utils.bulk_utils import (
     RawEpisode,
     add_nodes_and_edges_bulk,
@@ -59,12 +54,14 @@ from graphiti_core.utils.bulk_utils import (
     resolve_edge_pointers,
     retrieve_previous_episodes_bulk,
 )
+from graphiti_core.utils.datetime_utils import utc_now
 from graphiti_core.utils.maintenance.community_operations import (
     build_communities,
     remove_communities,
     update_community,
 )
 from graphiti_core.utils.maintenance.edge_operations import (
+    build_episodic_edges,
     dedupe_extracted_edge,
     extract_edges,
     resolve_edge_contradictions,
@@ -73,6 +70,7 @@ from graphiti_core.utils.maintenance.edge_operations import (
 from graphiti_core.utils.maintenance.graph_data_operations import (
     EPISODE_WINDOW_LEN,
     build_indices_and_constraints,
+    retrieve_episodes,
 )
 from graphiti_core.utils.maintenance.node_operations import (
     extract_nodes,
@@ -315,7 +313,7 @@ class Graphiti:
             start = time()
 
             entity_edges: list[EntityEdge] = []
-            now = datetime.now(timezone.utc)
+            now = utc_now()
 
             previous_episodes = await self.retrieve_episodes(
                 reference_time, last_n=RELEVANT_SCHEMA_LIMIT, group_ids=[group_id]
@@ -343,13 +341,13 @@ class Graphiti:
 
             # Calculate Embeddings
 
-            await asyncio.gather(
+            await semaphore_gather(
                 *[node.generate_name_embedding(self.embedder) for node in extracted_nodes]
             )
 
             # Find relevant nodes already in the graph
             existing_nodes_lists: list[list[EntityNode]] = list(
-                await asyncio.gather(
+                await semaphore_gather(
                     *[get_relevant_nodes(self.driver, [node]) for node in extracted_nodes]
                 )
             )
@@ -357,7 +355,7 @@ class Graphiti:
             # Resolve extracted nodes with nodes already in the graph and extract facts
             logger.debug(f'Extracted nodes: {[(n.name, n.uuid) for n in extracted_nodes]}')
 
-            (mentioned_nodes, uuid_map), extracted_edges = await asyncio.gather(
+            (mentioned_nodes, uuid_map), extracted_edges = await semaphore_gather(
                 resolve_extracted_nodes(
                     self.llm_client,
                     extracted_nodes,
@@ -377,7 +375,7 @@ class Graphiti:
             )
 
             # calculate embeddings
-            await asyncio.gather(
+            await semaphore_gather(
                 *[
                     edge.generate_embedding(self.embedder)
                     for edge in extracted_edges_with_resolved_pointers
@@ -386,7 +384,7 @@ class Graphiti:
 
             # Resolve extracted edges with related edges already in the graph
             related_edges_list: list[list[EntityEdge]] = list(
-                await asyncio.gather(
+                await semaphore_gather(
                     *[
                         get_relevant_edges(
                             self.driver,
@@ -407,7 +405,7 @@ class Graphiti:
             )
 
             existing_source_edges_list: list[list[EntityEdge]] = list(
-                await asyncio.gather(
+                await semaphore_gather(
                     *[
                         get_relevant_edges(
                             self.driver,
@@ -422,7 +420,7 @@ class Graphiti:
             )
 
             existing_target_edges_list: list[list[EntityEdge]] = list(
-                await asyncio.gather(
+                await semaphore_gather(
                     *[
                         get_relevant_edges(
                             self.driver,
@@ -471,7 +469,7 @@ class Graphiti:
 
             # Update any communities
             if update_communities:
-                await asyncio.gather(
+                await semaphore_gather(
                     *[
                         update_community(self.driver, self.llm_client, self.embedder, node)
                         for node in nodes
@@ -524,7 +522,7 @@ class Graphiti:
         """
         try:
             start = time()
-            now = datetime.now(timezone.utc)
+            now = utc_now()
 
             episodes = [
                 EpisodicNode(
@@ -541,7 +539,7 @@ class Graphiti:
             ]
 
             # Save all the episodes
-            await asyncio.gather(*[episode.save(self.driver) for episode in episodes])
+            await semaphore_gather(*[episode.save(self.driver) for episode in episodes])
 
             # Get previous episode context for each episode
             episode_pairs = await retrieve_previous_episodes_bulk(self.driver, episodes)
@@ -554,19 +552,19 @@ class Graphiti:
             ) = await extract_nodes_and_edges_bulk(self.llm_client, episode_pairs)
 
             # Generate embeddings
-            await asyncio.gather(
+            await semaphore_gather(
                 *[node.generate_name_embedding(self.embedder) for node in extracted_nodes],
                 *[edge.generate_embedding(self.embedder) for edge in extracted_edges],
             )
 
             # Dedupe extracted nodes, compress extracted edges
-            (nodes, uuid_map), extracted_edges_timestamped = await asyncio.gather(
+            (nodes, uuid_map), extracted_edges_timestamped = await semaphore_gather(
                 dedupe_nodes_bulk(self.driver, self.llm_client, extracted_nodes),
                 extract_edge_dates_bulk(self.llm_client, extracted_edges, episode_pairs),
             )
 
             # save nodes to KG
-            await asyncio.gather(*[node.save(self.driver) for node in nodes])
+            await semaphore_gather(*[node.save(self.driver) for node in nodes])
 
             # re-map edge pointers so that they don't point to discard dupe nodes
             extracted_edges_with_resolved_pointers: list[EntityEdge] = resolve_edge_pointers(
@@ -577,7 +575,7 @@ class Graphiti:
             )
 
             # save episodic edges to KG
-            await asyncio.gather(
+            await semaphore_gather(
                 *[edge.save(self.driver) for edge in episodic_edges_with_resolved_pointers]
             )
 
@@ -590,7 +588,7 @@ class Graphiti:
             # invalidate edges
 
             # save edges to KG
-            await asyncio.gather(*[edge.save(self.driver) for edge in edges])
+            await semaphore_gather(*[edge.save(self.driver) for edge in edges])
 
             end = time()
             logger.info(f'Completed add_episode_bulk in {(end - start) * 1000} ms')
@@ -613,12 +611,12 @@ class Graphiti:
             self.driver, self.llm_client, group_ids
         )
 
-        await asyncio.gather(
+        await semaphore_gather(
             *[node.generate_name_embedding(self.embedder) for node in community_nodes]
         )
 
-        await asyncio.gather(*[node.save(self.driver) for node in community_nodes])
-        await asyncio.gather(*[edge.save(self.driver) for edge in community_edges])
+        await semaphore_gather(*[node.save(self.driver) for node in community_nodes])
+        await semaphore_gather(*[edge.save(self.driver) for edge in community_edges])
 
         return community_nodes
 
@@ -722,7 +720,7 @@ class Graphiti:
     async def get_episode_mentions(self, episode_uuids: list[str]) -> SearchResults:
         episodes = await EpisodicNode.get_by_uuids(self.driver, episode_uuids)
 
-        edges_list = await asyncio.gather(
+        edges_list = await semaphore_gather(
             *[EntityEdge.get_by_uuids(self.driver, episode.entity_edges) for episode in episodes]
         )
 

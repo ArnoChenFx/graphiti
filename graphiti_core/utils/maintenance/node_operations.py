@@ -14,18 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import asyncio
 import logging
-from datetime import datetime, timezone
 from time import time
 
-from graphiti_core.helpers import MAX_REFLEXION_ITERATIONS
+from graphiti_core.helpers import MAX_REFLEXION_ITERATIONS, semaphore_gather
 from graphiti_core.llm_client import LLMClient
 from graphiti_core.nodes import EntityNode, EpisodeType, EpisodicNode
 from graphiti_core.prompts import prompt_library
 from graphiti_core.prompts.dedupe_nodes import NodeDuplicate
 from graphiti_core.prompts.extract_nodes import ExtractedNodes, MissedEntities
 from graphiti_core.prompts.summarize_nodes import Summary
+from graphiti_core.utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +154,7 @@ async def extract_nodes(
             group_id=episode.group_id,
             labels=['Entity'],
             summary='',
-            created_at=datetime.now(timezone.utc),
+            created_at=utc_now(),
         )
         new_nodes.append(new_node)
         logger.debug(f'Created new node: {new_node.name} (UUID: {new_node.uuid})')
@@ -223,7 +222,7 @@ async def resolve_extracted_nodes(
     uuid_map: dict[str, str] = {}
     resolved_nodes: list[EntityNode] = []
     results: list[tuple[EntityNode, dict[str, str]]] = list(
-        await asyncio.gather(
+        await semaphore_gather(
             *[
                 resolve_extracted_node(
                     llm_client, extracted_node, existing_nodes, episode, previous_episodes
@@ -275,7 +274,7 @@ async def resolve_extracted_node(
         else [],
     }
 
-    llm_response, node_summary_response = await asyncio.gather(
+    llm_response, node_summary_response = await semaphore_gather(
         llm_client.generate_response(
             prompt_library.dedupe_nodes.node(context), response_model=NodeDuplicate
         ),
