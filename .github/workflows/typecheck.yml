@@ -2,13 +2,13 @@ name: MyPy Type Check
 
 on:
   push:
-    branches: ["main"]
+    branches: ["release"]
   pull_request:
-    branches: ["main"]
+    branches: ["release"]
 
 jobs:
   mypy:
-    runs-on: depot-ubuntu-22.04
+    runs-on: ubuntu-latest
     environment: development
     steps:
       - uses: actions/checkout@v4

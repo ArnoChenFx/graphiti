@@ -68,6 +68,7 @@ async def search(
     search_filter: SearchFilters,
     center_node_uuid: str | None = None,
     bfs_origin_node_uuids: list[str] | None = None,
+    query_vector: list[float] | None = None,
 ) -> SearchResults:
     start = time()
     if query.strip() == '':
@@ -76,7 +77,8 @@ async def search(
             nodes=[],
             communities=[],
         )
-    query_vector = await embedder.create(input_data=[query.replace('\n', ' ')])
+    if not query_vector or not isinstance(query_vector, list):
+        query_vector = await embedder.create(input_data=[query.replace('\n', ' ')])
 
     # if group_ids is empty, set it to None
     group_ids = group_ids if group_ids else None

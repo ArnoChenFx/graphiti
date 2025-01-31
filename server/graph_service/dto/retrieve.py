@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -11,6 +12,11 @@ class SearchQuery(BaseModel):
     )
     query: str
     max_facts: int = Field(default=10, description='The maximum number of facts to retrieve')
+
+    min_score: Optional[float] = Field(default=None)
+    mmr_lambda: Optional[float] = Field(default=None)
+    search_type:  Optional[Literal["similarity", "mmr"]] = Field(default=None)
+    query_embedding:  Optional[list[float]] = Field(default=None)
 
 
 class FactResult(BaseModel):

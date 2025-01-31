@@ -17,6 +17,7 @@ limitations under the License.
 import logging
 from datetime import datetime
 from time import time
+from typing import Literal, Optional
 
 from dotenv import load_dotenv
 from neo4j import AsyncGraphDatabase
@@ -32,6 +33,7 @@ from graphiti_core.nodes import CommunityNode, EntityNode, EpisodeType, Episodic
 from graphiti_core.search.search import SearchConfig, search
 from graphiti_core.search.search_config import DEFAULT_SEARCH_LIMIT, SearchResults
 from graphiti_core.search.search_config_recipes import (
+    EDGE_HYBRID_SEARCH_MMR,
     EDGE_HYBRID_SEARCH_NODE_DISTANCE,
     EDGE_HYBRID_SEARCH_RRF,
 )
@@ -627,6 +629,10 @@ class Graphiti:
         group_ids: list[str] | None = None,
         num_results=DEFAULT_SEARCH_LIMIT,
         search_filter: SearchFilters | None = None,
+        search_type:  Literal["similarity", "mmr"] = "similarity",
+        min_score: Optional[float] = None,
+        mmr_lambda: Optional[float] = None,
+        query_vector: Optional[list[float]] = None,
     ) -> list[EntityEdge]:
         """
         Perform a hybrid search on the knowledge graph.
@@ -644,7 +650,11 @@ class Graphiti:
             The graph partitions to return data from.
         num_results : int, optional
             The maximum number of results to return. Defaults to 10.
-
+        search_type : str
+        min_score : float, optional
+            The minimum score for search results.
+        mmr_lambda : float, optional
+            The lambda parameter for the MMR Reranking Algorithm.
         Returns
         -------
         list
@@ -659,10 +669,22 @@ class Graphiti:
         The search is performed using the current date and time as the reference
         point for temporal relevance.
         """
-        search_config = (
-            EDGE_HYBRID_SEARCH_RRF if center_node_uuid is None else EDGE_HYBRID_SEARCH_NODE_DISTANCE
-        )
+
+        if center_node_uuid:
+            search_config = EDGE_HYBRID_SEARCH_NODE_DISTANCE.model_copy()
+        else:
+            if search_type == 'mmr':
+                search_config = EDGE_HYBRID_SEARCH_MMR.model_copy()
+            else:
+                search_config = EDGE_HYBRID_SEARCH_RRF.model_copy()
+
         search_config.limit = num_results
+        
+        if min_score and search_config.edge_config:
+            search_config.edge_config.sim_min_score = min_score
+
+        if mmr_lambda and search_config.edge_config:
+            search_config.edge_config.mmr_lambda = mmr_lambda
 
         edges = (
             await search(
@@ -674,6 +696,7 @@ class Graphiti:
                 search_config,
                 search_filter if search_filter is not None else SearchFilters(),
                 center_node_uuid,
+                query_vector=query_vector,
             )
         ).edges
 
