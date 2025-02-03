@@ -37,6 +37,7 @@ from graphiti_core.search.search_config_recipes import (
     EDGE_HYBRID_SEARCH_NODE_DISTANCE,
     EDGE_HYBRID_SEARCH_RRF,
 )
+from graphiti_core.search.search_filters import SearchFilters
 from graphiti_core.search.search_utils import (
     RELEVANT_SCHEMA_LIMIT,
     get_communities_by_nodes,
@@ -483,6 +484,7 @@ class Graphiti:
         except Exception as e:
             raise e
 
+    #### WIP: USE AT YOUR OWN RISK ####
     async def add_episode_bulk(self, bulk_episodes: list[RawEpisode], group_id: str = ''):
         """
         Process multiple episodes in bulk and update the graph.
@@ -626,6 +628,7 @@ class Graphiti:
         center_node_uuid: str | None = None,
         group_ids: list[str] | None = None,
         num_results=DEFAULT_SEARCH_LIMIT,
+        search_filter: SearchFilters | None = None,
         search_type:  Literal["similarity", "mmr"] = "similarity",
         min_score: Optional[float] = None,
         mmr_lambda: Optional[float] = None,
@@ -691,6 +694,7 @@ class Graphiti:
                 query,
                 group_ids,
                 search_config,
+                search_filter if search_filter is not None else SearchFilters(),
                 center_node_uuid,
                 query_vector=query_vector,
             )
@@ -705,6 +709,7 @@ class Graphiti:
         group_ids: list[str] | None = None,
         center_node_uuid: str | None = None,
         bfs_origin_node_uuids: list[str] | None = None,
+        search_filter: SearchFilters | None = None,
     ) -> SearchResults:
         return await search(
             self.driver,
@@ -713,6 +718,7 @@ class Graphiti:
             query,
             group_ids,
             config,
+            search_filter if search_filter is not None else SearchFilters(),
             center_node_uuid,
             bfs_origin_node_uuids,
         )
