@@ -1,9 +1,13 @@
-<div align="center">
+<p align="center">
+  <a href="https://www.getzep.com/">
+    <img src="https://github.com/user-attachments/assets/119c5682-9654-4257-8922-56b7cb8ffd73" width="150" alt="Zep Logo">
+  </a>
+</p>
 
-# Graphiti
-
-## Temporal Knowledge Graphs for Agentic Applications
-
+<h1 align="center">
+Graphiti
+</h1>
+<h2 align="center"> Temporal Knowledge Graphs for Agentic Applications</h2>
 <br />
 
 [![Discord](https://dcbadge.vercel.app/api/server/W8Kw6bsgXQ?style=flat)](https://discord.com/invite/W8Kw6bsgXQ)
@@ -12,9 +16,8 @@
 [![MyPy Check](https://github.com/getzep/Graphiti/actions/workflows/typecheck.yml/badge.svg)](https://github.com/getzep/Graphiti/actions/workflows/typecheck.yml)
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/getzep/Graphiti)
 
+:star: *Help us reach more developers and grow the Graphiti community. Star this repo!*
 <br />
-
-</div>
 
 Graphiti builds dynamic, temporally aware Knowledge Graphs that represent complex, evolving relationships between
 entities over time. Graphiti ingests both unstructured and structured data, and the resulting graph may be queried using
@@ -47,7 +50,8 @@ recall and state-based reasoning for both assistants and agents.
 
 Graphiti powers the core of [Zep's memory layer](https://www.getzep.com) for LLM-powered Assistants and Agents.
 
-Using Graphiti, we've demonstrated Zep is the [State of the Art in Agent Memory](https://blog.getzep.com/state-of-the-art-agent-memory/).
+Using Graphiti, we've demonstrated Zep is
+the [State of the Art in Agent Memory](https://blog.getzep.com/state-of-the-art-agent-memory/).
 
 Read our paper: [Zep: A Temporal Knowledge Graph Architecture for Agent Memory](https://arxiv.org/abs/2501.13956).
 
@@ -86,7 +90,7 @@ scale:
 Requirements:
 
 - Python 3.10 or higher
-- Neo4j 5.21 or higher
+- Neo4j 5.26 or higher
 - OpenAI API key (for LLM inference and embedding)
 
 Optional:
@@ -112,7 +116,8 @@ poetry add graphiti-core
 
 > [!IMPORTANT]
 > Graphiti uses OpenAI for LLM inference and embedding. Ensure that an `OPENAI_API_KEY` is set in your environment.
-> Support for Anthropic and Groq LLM inferences is available, too. Other LLM providers may be supported via OpenAI compatible APIs.
+> Support for Anthropic and Groq LLM inferences is available, too. Other LLM providers may be supported via OpenAI
+> compatible APIs.
 
 ```python
 from graphiti_core import Graphiti
@@ -177,7 +182,6 @@ graphiti.close()
 ```
 
 ## Graph Service
-
 The `server` directory contains an API service for interacting with the Graphiti API. It is built using FastAPI.
 
 Please see the [server README](./server/README.md) for more information.
@@ -204,8 +208,8 @@ as such this feature is off by default.
 Graphiti is under active development. We aim to maintain API stability while working on:
 
 - [ ] Supporting custom graph schemas:
-  - Allow developers to provide their own defined node and edge classes when ingesting episodes
-  - Enable more flexible knowledge representation tailored to specific use cases
+    - Allow developers to provide their own defined node and edge classes when ingesting episodes
+    - Enable more flexible knowledge representation tailored to specific use cases
 - [x] Enhancing retrieval capabilities with more robust and configurable options
 - [ ] Expanding test coverage to ensure reliability and catch edge cases
 

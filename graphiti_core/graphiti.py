@@ -353,7 +353,10 @@ class Graphiti:
             # Find relevant nodes already in the graph
             existing_nodes_lists: list[list[EntityNode]] = list(
                 await semaphore_gather(
-                    *[get_relevant_nodes(self.driver, [node]) for node in extracted_nodes]
+                    *[
+                        get_relevant_nodes(self.driver, SearchFilters(), [node])
+                        for node in extracted_nodes
+                    ]
                 )
             )
 
@@ -755,8 +758,8 @@ class Graphiti:
             self.llm_client,
             [source_node, target_node],
             [
-                await get_relevant_nodes(self.driver, [source_node]),
-                await get_relevant_nodes(self.driver, [target_node]),
+                await get_relevant_nodes(self.driver, SearchFilters(), [source_node]),
+                await get_relevant_nodes(self.driver, SearchFilters(), [target_node]),
             ],
         )
 
