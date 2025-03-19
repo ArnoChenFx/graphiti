@@ -16,12 +16,12 @@ Graphiti
 [![MyPy Check](https://github.com/getzep/Graphiti/actions/workflows/typecheck.yml/badge.svg)](https://github.com/getzep/Graphiti/actions/workflows/typecheck.yml)
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/getzep/Graphiti)
 
-:star: *Help us reach more developers and grow the Graphiti community. Star this repo!*
+:star: _Help us reach more developers and grow the Graphiti community. Star this repo!_
 <br />
 
 Graphiti builds dynamic, temporally aware Knowledge Graphs that represent complex, evolving relationships between
 entities over time. Graphiti ingests both unstructured and structured data, and the resulting graph may be queried using
-a fusion of time, full-text, semantic, and graph algorithm approaches.
+a fusion of time, full-text, semantic, and graph algorithm approaches, effectively serving as a powerful memory layer for AI applications.
 
 <br />
 
@@ -40,11 +40,10 @@ while handling changing relationships and maintaining historical context.
 With Graphiti, you can build LLM applications such as:
 
 - Assistants that learn from user interactions, fusing personal knowledge with dynamic data from business systems like
-  CRMs and billing platforms.
-- Agents that autonomously execute complex tasks, reasoning with state changes from multiple dynamic sources.
+  CRMs and billing platforms through robust conversation history management.
+- Agents that autonomously execute complex tasks, reasoning with state changes from multiple dynamic sources through persistent memory.
 
-Graphiti supports a wide range of applications in sales, customer service, health, finance, and more, enabling long-term
-recall and state-based reasoning for both assistants and agents.
+Graphiti supports a wide range of applications in sales, customer service, health, finance, and more, enabling long-term recall and state-based reasoning for both assistants and agents.
 
 ## Graphiti and Zep Memory
 
@@ -55,7 +54,7 @@ the [State of the Art in Agent Memory](https://blog.getzep.com/state-of-the-art-
 
 Read our paper: [Zep: A Temporal Knowledge Graph Architecture for Agent Memory](https://arxiv.org/abs/2501.13956).
 
-We're excited to open-source Graphiti, believing its potential reaches far beyond memory applications.
+We're excited to open-source Graphiti, believing its potential reaches far beyond AI memory applications.
 
 <p align="center">
     <a href="https://arxiv.org/abs/2501.13956"><img src="images/arxiv-screenshot.png" alt="Zep: A Temporal Knowledge Graph Architecture for Agent Memory" width="700px"></a>
@@ -63,7 +62,7 @@ We're excited to open-source Graphiti, believing its potential reaches far beyon
 
 ## Why Graphiti?
 
-We were intrigued by Microsoft’s GraphRAG, which expanded on RAG text chunking by using a graph to better model a
+We were intrigued by Microsoft's GraphRAG, which expanded on RAG (Retrieval-Augmented Generation) text chunking by using a graph to better model a
 document corpus and making this representation available via semantic and graph search techniques. However, GraphRAG did
 not address our core problem: It's primarily designed for static documents and doesn't inherently handle temporal
 aspects of data.
@@ -72,13 +71,13 @@ Graphiti is designed from the ground up to handle constantly changing informatio
 scale:
 
 - **Temporal Awareness:** Tracks changes in facts and relationships over time, enabling point-in-time queries. Graph
-  edges include temporal metadata to record relationship lifecycles.
+  edges include temporal metadata to record relationship lifecycles, creating a comprehensive context window extension.
 - **Episodic Processing:** Ingests data as discrete episodes, maintaining data provenance and allowing incremental
-  entity and relationship extraction.
+  entity and relationship extraction, ideal for chat state management.
 - **Hybrid Search:** Combines semantic and BM25 full-text search, with the ability to rerank results by distance from a
-  central node e.g. “Kendra”.
+  central node e.g. "Kendra".
 - **Scalable:** Designed for processing large datasets, with parallelization of LLM calls for bulk processing while
-  preserving the chronology of events.
+  preserving the chronology of events and enabling efficient knowledge retrieval.
 - **Supports Varied Sources:** Can ingest both unstructured text and structured JSON data.
 
 <p align="center">
@@ -90,7 +89,7 @@ scale:
 Requirements:
 
 - Python 3.10 or higher
-- Neo4j 5.26 or higher
+- Neo4j 5.26 or higher (serves as the embeddings storage backend)
 - OpenAI API key (for LLM inference and embedding)
 
 Optional:
@@ -124,7 +123,7 @@ from graphiti_core import Graphiti
 from graphiti_core.nodes import EpisodeType
 from datetime import datetime, timezone
 
-# Initialize Graphiti
+# Initialize Graphiti as Your Memory Layer
 graphiti = Graphiti("bolt://localhost:7687", "neo4j", "password")
 
 # Initialize the graph database with Graphiti's indices. This only needs to be done once.
@@ -145,7 +144,7 @@ for i, episode in enumerate(episodes):
         reference_time=datetime.now(timezone.utc)
     )
 
-# Search the graph
+# Search the graph for semantic memory retrieval
 # Execute a hybrid search combining semantic similarity and BM25 retrieval
 # Results are combined and reranked using Reciprocal Rank Fusion
 results = await graphiti.search('Who was the California Attorney General?')
@@ -177,11 +176,12 @@ results = await graphiti.search('Who was the California Attorney General?')
 # Results are weighted by their proximity, with distant edges receiving lower scores.
 await graphiti.search('Who was the California Attorney General?', center_node_uuid)
 
-# Close the connection
+# Close the connection when chat state management is complete
 graphiti.close()
 ```
 
 ## Graph Service
+
 The `server` directory contains an API service for interacting with the Graphiti API. It is built using FastAPI.
 
 Please see the [server README](./server/README.md) for more information.
@@ -197,6 +197,54 @@ to enable Neo4j's parallel runtime feature for several of our search queries.
 Note that this feature is not supported for Neo4j Community edition or for smaller AuraDB instances,
 as such this feature is off by default.
 
+## Using Graphiti with Azure OpenAI
+
+Graphiti supports Azure OpenAI for both LLM inference and embeddings. To use Azure OpenAI, you'll need to configure both the LLM client and embedder with your Azure OpenAI credentials.
+
+```python
+from openai import AsyncAzureOpenAI
+from graphiti_core import Graphiti
+from graphiti_core.llm_client import OpenAIClient
+from graphiti_core.embedder.openai import OpenAIEmbedder, OpenAIEmbedderConfig
+from graphiti_core.cross_encoder.openai_reranker_client import OpenAIRerankerClient
+
+# Azure OpenAI configuration
+api_key = "<your-api-key>"
+api_version = "<your-api-version>"
+azure_endpoint = "<your-azure-endpoint>"
+
+# Create Azure OpenAI client for LLM
+azure_openai_client = AsyncAzureOpenAI(
+    api_key=api_key,
+    api_version=api_version,
+    azure_endpoint=azure_endpoint
+)
+
+# Initialize Graphiti with Azure OpenAI clients
+graphiti = Graphiti(
+    "bolt://localhost:7687",
+    "neo4j",
+    "password",
+    llm_client=OpenAIClient(
+        client=azure_openai_client
+    ),
+    embedder=OpenAIEmbedder(
+        config=OpenAIEmbedderConfig(
+            embedding_model="text-embedding-3-small"  # Use your Azure deployed embedding model name
+        ),
+        client=azure_openai_client
+    ),
+    # Optional: Configure the OpenAI cross encoder with Azure OpenAI
+    cross_encoder=OpenAIRerankerClient(
+        client=azure_openai_client
+    )
+)
+
+# Now you can use Graphiti with Azure OpenAI
+```
+
+Make sure to replace the placeholder values with your actual Azure OpenAI credentials and specify the correct embedding model name that's deployed in your Azure OpenAI service.
+
 ## Documentation
 
 - [Guides and API documentation](https://help.getzep.com/graphiti).
@@ -207,9 +255,9 @@ as such this feature is off by default.
 
 Graphiti is under active development. We aim to maintain API stability while working on:
 
-- [ ] Supporting custom graph schemas:
-    - Allow developers to provide their own defined node and edge classes when ingesting episodes
-    - Enable more flexible knowledge representation tailored to specific use cases
+- [x] Supporting custom graph schemas:
+  - Allow developers to provide their own defined node and edge classes when ingesting episodes
+  - Enable more flexible knowledge representation tailored to specific use cases
 - [x] Enhancing retrieval capabilities with more robust and configurable options
 - [ ] Expanding test coverage to ensure reliability and catch edge cases
 

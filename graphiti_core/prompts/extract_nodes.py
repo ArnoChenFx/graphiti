@@ -30,10 +30,17 @@ class MissedEntities(BaseModel):
     missed_entities: list[str] = Field(..., description="Names of entities that weren't extracted")
 
 
+class EntityClassificationTriple(BaseModel):
+    uuid: str = Field(description='UUID of the entity')
+    name: str = Field(description='Name of the entity')
+    entity_type: str | None = Field(
+        default=None, description='Type of the entity. Must be one of the provided types or None'
+    )
+
+
 class EntityClassification(BaseModel):
-    entity_classification: str = Field(
-        ...,
-        description='Dictionary of entity classifications. Key is the entity name and value is the entity type',
+    entity_classifications: list[EntityClassificationTriple] = Field(
+        ..., description='List of entities classification triples.'
     )
 
 
@@ -176,11 +183,12 @@ def classify_nodes(context: dict[str, Any]) -> list[Message]:
     {context['entity_types']}
     </ENTITY TYPES>
     
-    Given the above conversation, extracted entities, and provided entity types, classify the extracted entities.
+    Given the above conversation, extracted entities, and provided entity types and their descriptions, classify the extracted entities.
     
     Guidelines:
     1. Each entity must have exactly one type
-    2. If none of the provided entity types accurately classify an extracted node, the type should be set to None
+    2. Only use the provided ENTITY TYPES as types, do not use additional types to classify entities.
+    3. If none of the provided entity types accurately classify an extracted node, the type should be set to None
 """
     return [
         Message(role='system', content=sys_prompt),

@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-import ast
 import logging
 from time import time
 
@@ -26,7 +25,11 @@ from graphiti_core.llm_client import LLMClient
 from graphiti_core.nodes import EntityNode, EpisodeType, EpisodicNode
 from graphiti_core.prompts import prompt_library
 from graphiti_core.prompts.dedupe_nodes import NodeDuplicate
-from graphiti_core.prompts.extract_nodes import EntityClassification, ExtractedNodes, MissedEntities
+from graphiti_core.prompts.extract_nodes import (
+    EntityClassification,
+    ExtractedNodes,
+    MissedEntities,
+)
 from graphiti_core.prompts.summarize_nodes import Summary
 from graphiti_core.utils.datetime_utils import utc_now
 
@@ -153,18 +156,32 @@ async def extract_nodes(
         'episode_content': episode.content,
         'previous_episodes': [ep.content for ep in previous_episodes],
         'extracted_entities': extracted_node_names,
-        'entity_types': entity_types.keys() if entity_types is not None else [],
+        'entity_types': {
+            type_name: values.model_json_schema().get('description')
+            for type_name, values in entity_types.items()
+        }
+        if entity_types is not None
+        else {},
     }
 
     node_classifications: dict[str, str | None] = {}
 
     if entity_types is not None:
-        llm_response = await llm_client.generate_response(
-            prompt_library.extract_nodes.classify_nodes(node_classification_context),
-            response_model=EntityClassification,
-        )
-        response_string = llm_response.get('entity_classification', '{}')
-        node_classifications.update(ast.literal_eval(response_string))
+        try:
+            llm_response = await llm_client.generate_response(
+                prompt_library.extract_nodes.classify_nodes(node_classification_context),
+                response_model=EntityClassification,
+            )
+            entity_classifications = llm_response.get('entity_classifications', [])
+            node_classifications.update(
+                {
+                    entity_classification.get('name'): entity_classification.get('entity_type')
+                    for entity_classification in entity_classifications
+                }
+            )
+        # catch classification errors and continue if we can't classify
+        except Exception as e:
+            logger.exception(e)
 
     end = time()
     logger.debug(f'Extracted new nodes: {extracted_node_names} in {(end - start) * 1000} ms')
@@ -172,7 +189,14 @@ async def extract_nodes(
     new_nodes = []
     for name in extracted_node_names:
         entity_type = node_classifications.get(name)
-        labels = ['Entity'] if entity_type is None else ['Entity', entity_type]
+        if entity_types is not None and entity_type not in entity_types:
+            entity_type = None
+
+        labels = (
+            ['Entity']
+            if entity_type is None or entity_type == 'None' or entity_type == 'null'
+            else ['Entity', entity_type]
+        )
 
         new_node = EntityNode(
             name=name,
@@ -281,7 +305,10 @@ async def resolve_extracted_node(
     start = time()
 
     # Prepare context for LLM
-    existing_nodes_context = [{'uuid': node.uuid, 'name': node.name} for node in existing_nodes]
+    existing_nodes_context = [
+        {'uuid': node.uuid, 'name': node.name, 'attributes': node.attributes}
+        for node in existing_nodes
+    ]
 
     extracted_node_context = {
         'uuid': extracted_node.uuid,
@@ -358,6 +385,13 @@ async def resolve_extracted_node(
             node = existing_node
             node.name = name
             node.summary = summary_response.get('summary', '')
+
+            new_attributes = existing_node.attributes
+            existing_attributes = existing_node.attributes
+            for attribute_name, attribute_value in existing_attributes.items():
+                if new_attributes.get(attribute_name) is None:
+                    new_attributes[attribute_name] = attribute_value
+
             uuid_map[extracted_node.uuid] = existing_node.uuid
 
     end = time()
