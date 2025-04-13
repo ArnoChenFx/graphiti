@@ -143,9 +143,9 @@ class EpisodicEdge(Edge):
         driver: AsyncDriver,
         group_ids: list[str],
         limit: int | None = None,
-        created_at: datetime | None = None,
+        uuid_cursor: str | None = None,
     ):
-        cursor_query: LiteralString = 'AND e.created_at < $created_at' if created_at else ''
+        cursor_query: LiteralString = 'AND e.uuid < $uuid' if uuid_cursor else ''
         limit_query: LiteralString = 'LIMIT $limit' if limit is not None else ''
 
         records, _, _ = await driver.execute_query(
@@ -165,7 +165,7 @@ class EpisodicEdge(Edge):
         """
             + limit_query,
             group_ids=group_ids,
-            created_at=created_at,
+            uuid=uuid_cursor,
             limit=limit,
             database_=DEFAULT_DATABASE,
             routing_='r',
@@ -261,6 +261,9 @@ class EntityEdge(Edge):
 
     @classmethod
     async def get_by_uuids(cls, driver: AsyncDriver, uuids: list[str]):
+        if len(uuids) == 0:
+            return []
+
         records, _, _ = await driver.execute_query(
             """
         MATCH (n:Entity)-[e:RELATES_TO]->(m:Entity)
@@ -286,8 +289,6 @@ class EntityEdge(Edge):
 
         edges = [get_entity_edge_from_record(record) for record in records]
 
-        if len(edges) == 0:
-            raise EdgeNotFoundError(uuids[0])
         return edges
 
     @classmethod
@@ -296,9 +297,9 @@ class EntityEdge(Edge):
         driver: AsyncDriver,
         group_ids: list[str],
         limit: int | None = None,
-        created_at: datetime | None = None,
+        uuid_cursor: str | None = None,
     ):
-        cursor_query: LiteralString = 'AND e.created_at < $created_at' if created_at else ''
+        cursor_query: LiteralString = 'AND e.uuid < $uuid' if uuid_cursor else ''
         limit_query: LiteralString = 'LIMIT $limit' if limit is not None else ''
 
         records, _, _ = await driver.execute_query(
@@ -325,7 +326,7 @@ class EntityEdge(Edge):
         """
             + limit_query,
             group_ids=group_ids,
-            created_at=created_at,
+            uuid=uuid_cursor,
             limit=limit,
             database_=DEFAULT_DATABASE,
             routing_='r',
@@ -429,9 +430,9 @@ class CommunityEdge(Edge):
         driver: AsyncDriver,
         group_ids: list[str],
         limit: int | None = None,
-        created_at: datetime | None = None,
+        uuid_cursor: str | None = None,
     ):
-        cursor_query: LiteralString = 'AND e.created_at < $created_at' if created_at else ''
+        cursor_query: LiteralString = 'AND e.uuid < $uuid' if uuid_cursor else ''
         limit_query: LiteralString = 'LIMIT $limit' if limit is not None else ''
 
         records, _, _ = await driver.execute_query(
@@ -451,7 +452,7 @@ class CommunityEdge(Edge):
         """
             + limit_query,
             group_ids=group_ids,
-            created_at=created_at,
+            uuid=uuid_cursor,
             limit=limit,
             database_=DEFAULT_DATABASE,
             routing_='r',

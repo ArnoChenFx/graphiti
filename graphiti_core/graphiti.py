@@ -34,6 +34,7 @@ from graphiti_core.nodes import CommunityNode, EntityNode, EpisodeType, Episodic
 from graphiti_core.search.search import SearchConfig, search
 from graphiti_core.search.search_config import DEFAULT_SEARCH_LIMIT, SearchResults
 from graphiti_core.search.search_config_recipes import (
+    COMBINED_HYBRID_SEARCH_CROSS_ENCODER,
     EDGE_HYBRID_SEARCH_MMR,
     EDGE_HYBRID_SEARCH_NODE_DISTANCE,
     EDGE_HYBRID_SEARCH_RRF,
@@ -73,11 +74,9 @@ from graphiti_core.utils.maintenance.graph_data_operations import (
     build_indices_and_constraints,
     retrieve_episodes,
 )
-from graphiti_core.utils.maintenance.node_operations import (
-    extract_nodes,
-    resolve_extracted_nodes,
-)
+from graphiti_core.utils.maintenance.node_operations import extract_nodes, resolve_extracted_nodes
 from graphiti_core.utils.maintenance.temporal_operations import get_edge_contradictions
+from graphiti_core.utils.ontology_utils.entity_types_utils import validate_entity_types
 
 logger = logging.getLogger(__name__)
 
@@ -264,6 +263,7 @@ class Graphiti:
         uuid: str | None = None,
         update_communities: bool = False,
         entity_types: dict[str, BaseModel] | None = None,
+        previous_episode_uuids: list[str] | None = None,
     ) -> AddEpisodeResults:
         """
         Process an episode and update the graph.
@@ -289,6 +289,9 @@ class Graphiti:
             Optional uuid of the episode.
         update_communities : bool
             Optional. Whether to update communities with new node information
+        previous_episode_uuids : list[str] | None
+            Optional.  list of episode uuids to use as the previous episodes. If this is not provided,
+            the most recent episodes by created_at date will be used.
 
         Returns
         -------
@@ -317,8 +320,14 @@ class Graphiti:
             entity_edges: list[EntityEdge] = []
             now = utc_now()
 
-            previous_episodes = await self.retrieve_episodes(
-                reference_time, last_n=RELEVANT_SCHEMA_LIMIT, group_ids=[group_id]
+            validate_entity_types(entity_types)
+
+            previous_episodes = (
+                await self.retrieve_episodes(
+                    reference_time, last_n=RELEVANT_SCHEMA_LIMIT, group_ids=[group_id]
+                )
+                if previous_episode_uuids is None
+                else await EpisodicNode.get_by_uuids(self.driver, previous_episode_uuids)
             )
 
             episode = (
@@ -445,7 +454,7 @@ class Graphiti:
             existing_edges_list: list[list[EntityEdge]] = [
                 source_lst + target_lst
                 for source_lst, target_lst in zip(
-                    existing_source_edges_list, existing_target_edges_list
+                    existing_source_edges_list, existing_target_edges_list, strict=False
                 )
             ]
 
@@ -645,7 +654,10 @@ class Graphiti:
         Perform a hybrid search on the knowledge graph.
 
         This method executes a search query on the graph, combining vector and
-        text-based search techniques to retrieve relevant facts.
+        text-based search techniques to retrieve relevant facts, returning the edges as a string.
+
+        This is our basic out-of-the-box search, for more robust results we recommend using our more advanced
+        search method graphiti.search_().
 
         Parameters
         ----------
@@ -670,8 +682,7 @@ class Graphiti:
         Notes
         -----
         This method uses a SearchConfig with num_episodes set to 0 and
-        num_results set to the provided num_results parameter. It then calls
-        the hybrid_search function to perform the actual search operation.
+        num_results set to the provided num_results parameter.
 
         The search is performed using the current date and time as the reference
         point for temporal relevance.
@@ -718,6 +729,27 @@ class Graphiti:
         bfs_origin_node_uuids: list[str] | None = None,
         search_filter: SearchFilters | None = None,
     ) -> SearchResults:
+        """DEPRECATED"""
+        return await self.search_(
+            query, config, group_ids, center_node_uuid, bfs_origin_node_uuids, search_filter
+        )
+
+    async def search_(
+        self,
+        query: str,
+        config: SearchConfig = COMBINED_HYBRID_SEARCH_CROSS_ENCODER,
+        group_ids: list[str] | None = None,
+        center_node_uuid: str | None = None,
+        bfs_origin_node_uuids: list[str] | None = None,
+        search_filter: SearchFilters | None = None,
+    ) -> SearchResults:
+        """search_ (replaces _search) is our advanced search method that returns Graph objects (nodes and edges) rather
+        than a list of facts. This endpoint allows the end user to utilize more advanced features such as filters and
+        different search and reranker methodologies across different layers in the graph.
+
+        For different config recipes refer to search/search_config_recipes.
+        """
+
         return await search(
             self.driver,
             self.embedder,

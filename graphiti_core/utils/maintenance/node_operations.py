@@ -15,6 +15,7 @@ limitations under the License.
 """
 
 import logging
+from contextlib import suppress
 from time import time
 
 import pydantic
@@ -25,11 +26,7 @@ from graphiti_core.llm_client import LLMClient
 from graphiti_core.nodes import EntityNode, EpisodeType, EpisodicNode
 from graphiti_core.prompts import prompt_library
 from graphiti_core.prompts.dedupe_nodes import NodeDuplicate
-from graphiti_core.prompts.extract_nodes import (
-    EntityClassification,
-    ExtractedNodes,
-    MissedEntities,
-)
+from graphiti_core.prompts.extract_nodes import EntityClassification, ExtractedNodes, MissedEntities
 from graphiti_core.prompts.summarize_nodes import Summary
 from graphiti_core.utils.datetime_utils import utc_now
 
@@ -282,7 +279,9 @@ async def resolve_extracted_nodes(
                     previous_episodes,
                     entity_types,
                 )
-                for extracted_node, existing_nodes in zip(extracted_nodes, existing_nodes_lists)
+                for extracted_node, existing_nodes in zip(
+                    extracted_nodes, existing_nodes_lists, strict=False
+                )
             ]
         )
     )
@@ -364,7 +363,15 @@ async def resolve_extracted_node(
     )
 
     extracted_node.summary = node_attributes_response.get('summary', '')
-    extracted_node.attributes.update(node_attributes_response)
+    node_attributes = {
+        key: value if (value != 'None' or key == 'summary') else None
+        for key, value in node_attributes_response.items()
+    }
+
+    with suppress(KeyError):
+        del node_attributes['summary']
+
+    extracted_node.attributes.update(node_attributes)
 
     is_duplicate: bool = llm_response.get('is_duplicate', False)
     uuid: str | None = llm_response.get('uuid', None)
@@ -386,11 +393,12 @@ async def resolve_extracted_node(
             node.name = name
             node.summary = summary_response.get('summary', '')
 
-            new_attributes = existing_node.attributes
+            new_attributes = extracted_node.attributes
             existing_attributes = existing_node.attributes
             for attribute_name, attribute_value in existing_attributes.items():
                 if new_attributes.get(attribute_name) is None:
                     new_attributes[attribute_name] = attribute_value
+            node.attributes = new_attributes
 
             uuid_map[extracted_node.uuid] = existing_node.uuid
 
