@@ -1,20 +1,15 @@
 name: Build image
- 
+
 on:
   push:
     # Publish semver tags as releases.
-    tags: [ 'v*.*.*' ]
+    tags: ["v*.*.*"]
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  
+
 jobs:
-  build_and_start_svc:
-    uses: ./.github/workflows/build-and-start-svc.yml
-    permissions:
-      contents: read
-      id-token: write
   docker-image:
     needs: build_and_start_svc
     environment:
