@@ -37,6 +37,20 @@ from graphiti_core.nodes import Node
 
 logger = logging.getLogger(__name__)
 
+ENTITY_EDGE_RETURN: LiteralString = """
+        RETURN
+            e.uuid AS uuid,
+            startNode(e).uuid AS source_node_uuid,
+            endNode(e).uuid AS target_node_uuid,
+            e.created_at AS created_at,
+            e.name AS name,
+            e.group_id AS group_id,
+            e.fact AS fact,
+            e.episodes AS episodes,
+            e.expired_at AS expired_at,
+            e.valid_at AS valid_at,
+            e.invalid_at AS invalid_at"""
+
 
 class Edge(BaseModel, ABC):
     uuid: str = Field(default_factory=lambda: str(uuid4()))
@@ -207,6 +221,20 @@ class EntityEdge(Edge):
 
         return self.fact_embedding
 
+    async def load_fact_embedding(self, driver: AsyncDriver):
+        query: LiteralString = """
+            MATCH (n:Entity)-[e:RELATES_TO {uuid: $uuid}]->(m:Entity)
+            RETURN e.fact_embedding AS fact_embedding
+        """
+        records, _, _ = await driver.execute_query(
+            query, uuid=self.uuid, database_=DEFAULT_DATABASE, routing_='r'
+        )
+
+        if len(records) == 0:
+            raise EdgeNotFoundError(self.uuid)
+
+        self.fact_embedding = records[0]['fact_embedding']
+
     async def save(self, driver: AsyncDriver):
         result = await driver.execute_query(
             ENTITY_EDGE_SAVE,
@@ -234,20 +262,8 @@ class EntityEdge(Edge):
         records, _, _ = await driver.execute_query(
             """
         MATCH (n:Entity)-[e:RELATES_TO {uuid: $uuid}]->(m:Entity)
-        RETURN
-            e.uuid AS uuid,
-            n.uuid AS source_node_uuid,
-            m.uuid AS target_node_uuid,
-            e.created_at AS created_at,
-            e.name AS name,
-            e.group_id AS group_id,
-            e.fact AS fact,
-            e.fact_embedding AS fact_embedding,
-            e.episodes AS episodes,
-            e.expired_at AS expired_at,
-            e.valid_at AS valid_at,
-            e.invalid_at AS invalid_at
-        """,
+        """
+            + ENTITY_EDGE_RETURN,
             uuid=uuid,
             database_=DEFAULT_DATABASE,
             routing_='r',
@@ -268,20 +284,8 @@ class EntityEdge(Edge):
             """
         MATCH (n:Entity)-[e:RELATES_TO]->(m:Entity)
         WHERE e.uuid IN $uuids
-        RETURN
-            e.uuid AS uuid,
-            n.uuid AS source_node_uuid,
-            m.uuid AS target_node_uuid,
-            e.created_at AS created_at,
-            e.name AS name,
-            e.group_id AS group_id,
-            e.fact AS fact,
-            e.fact_embedding AS fact_embedding,
-            e.episodes AS episodes,
-            e.expired_at AS expired_at,
-            e.valid_at AS valid_at,
-            e.invalid_at AS invalid_at
-        """,
+        """
+            + ENTITY_EDGE_RETURN,
             uuids=uuids,
             database_=DEFAULT_DATABASE,
             routing_='r',
@@ -308,20 +312,8 @@ class EntityEdge(Edge):
         WHERE e.group_id IN $group_ids
         """
             + cursor_query
+            + ENTITY_EDGE_RETURN
             + """
-        RETURN
-            e.uuid AS uuid,
-            n.uuid AS source_node_uuid,
-            m.uuid AS target_node_uuid,
-            e.created_at AS created_at,
-            e.name AS name,
-            e.group_id AS group_id,
-            e.fact AS fact,
-            e.fact_embedding AS fact_embedding,
-            e.episodes AS episodes,
-            e.expired_at AS expired_at,
-            e.valid_at AS valid_at,
-            e.invalid_at AS invalid_at
         ORDER BY e.uuid DESC 
         """
             + limit_query,
@@ -340,22 +332,12 @@ class EntityEdge(Edge):
 
     @classmethod
     async def get_by_node_uuid(cls, driver: AsyncDriver, node_uuid: str):
-        query: LiteralString = """
-        MATCH (n:Entity {uuid: $node_uuid})-[e:RELATES_TO]-(m:Entity)
-        RETURN DISTINCT
-            e.uuid AS uuid,
-            n.uuid AS source_node_uuid,
-            m.uuid AS target_node_uuid,
-            e.created_at AS created_at,
-            e.name AS name,
-            e.group_id AS group_id,
-            e.fact AS fact,
-            e.fact_embedding AS fact_embedding,
-            e.episodes AS episodes,
-            e.expired_at AS expired_at,
-            e.valid_at AS valid_at,
-            e.invalid_at AS invalid_at
-        """
+        query: LiteralString = (
+            """
+                                        MATCH (n:Entity {uuid: $node_uuid})-[e:RELATES_TO]-(m:Entity)
+                                        """
+            + ENTITY_EDGE_RETURN
+        )
         records, _, _ = await driver.execute_query(
             query, node_uuid=node_uuid, database_=DEFAULT_DATABASE, routing_='r'
         )
@@ -483,7 +465,6 @@ def get_entity_edge_from_record(record: Any) -> EntityEdge:
         name=record['name'],
         group_id=record['group_id'],
         episodes=record['episodes'],
-        fact_embedding=record['fact_embedding'],
         created_at=record['created_at'].to_native(),
         expired_at=parse_db_date(record['expired_at']),
         valid_at=parse_db_date(record['valid_at']),
@@ -499,3 +480,11 @@ def get_community_edge_from_record(record: Any):
         target_node_uuid=record['target_node_uuid'],
         created_at=record['created_at'].to_native(),
     )
+
+
+async def create_entity_edge_embeddings(embedder: EmbedderClient, edges: list[EntityEdge]):
+    if len(edges) == 0:
+        return
+    fact_embeddings = await embedder.create_batch([edge.fact for edge in edges])
+    for edge, fact_embedding in zip(edges, fact_embeddings, strict=True):
+        edge.fact_embedding = fact_embedding

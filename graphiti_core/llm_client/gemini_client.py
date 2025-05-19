@@ -24,7 +24,7 @@ from pydantic import BaseModel
 
 from ..prompts.models import Message
 from .client import LLMClient
-from .config import DEFAULT_MAX_TOKENS, LLMConfig
+from .config import DEFAULT_MAX_TOKENS, LLMConfig, ModelSize
 from .errors import RateLimitError
 
 logger = logging.getLogger(__name__)
@@ -82,6 +82,7 @@ class GeminiClient(LLMClient):
         messages: list[Message],
         response_model: type[BaseModel] | None = None,
         max_tokens: int = DEFAULT_MAX_TOKENS,
+        model_size: ModelSize = ModelSize.medium,
     ) -> dict[str, typing.Any]:
         """
         Generate a response from the Gemini language model.
@@ -166,7 +167,8 @@ class GeminiClient(LLMClient):
         self,
         messages: list[Message],
         response_model: type[BaseModel] | None = None,
-        max_tokens: int = DEFAULT_MAX_TOKENS,
+        max_tokens: int | None = None,
+        model_size: ModelSize = ModelSize.medium,
     ) -> dict[str, typing.Any]:
         """
         Generate a response from the Gemini language model.
@@ -180,7 +182,13 @@ class GeminiClient(LLMClient):
         Returns:
             dict[str, typing.Any]: The response from the language model.
         """
+        if max_tokens is None:
+            max_tokens = self.max_tokens
+
         # Call the internal _generate_response method
         return await self._generate_response(
-            messages=messages, response_model=response_model, max_tokens=max_tokens
+            messages=messages,
+            response_model=response_model,
+            max_tokens=max_tokens,
+            model_size=model_size,
         )

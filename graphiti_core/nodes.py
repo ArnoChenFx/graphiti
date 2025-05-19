@@ -38,6 +38,17 @@ from graphiti_core.utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
+ENTITY_NODE_RETURN: LiteralString = """
+        RETURN
+            n.uuid As uuid, 
+            n.name AS name,
+            n.group_id AS group_id,
+            n.created_at AS created_at, 
+            n.summary AS summary,
+            labels(n) AS labels,
+            properties(n) AS attributes
+            """
+
 
 class EpisodeType(Enum):
     """
@@ -251,6 +262,31 @@ class EpisodicNode(Node):
 
         return episodes
 
+    @classmethod
+    async def get_by_entity_node_uuid(cls, driver: AsyncDriver, entity_node_uuid: str):
+        records, _, _ = await driver.execute_query(
+            """
+        MATCH (e:Episodic)-[r:MENTIONS]->(n:Entity {uuid: $entity_node_uuid})
+            RETURN DISTINCT
+            e.content AS content,
+            e.created_at AS created_at,
+            e.valid_at AS valid_at,
+            e.uuid AS uuid,
+            e.name AS name,
+            e.group_id AS group_id,
+            e.source_description AS source_description,
+            e.source AS source,
+            e.entity_edges AS entity_edges
+        """,
+            entity_node_uuid=entity_node_uuid,
+            database_=DEFAULT_DATABASE,
+            routing_='r',
+        )
+
+        episodes = [get_episodic_node_from_record(record) for record in records]
+
+        return episodes
+
 
 class EntityNode(Node):
     name_embedding: list[float] | None = Field(default=None, description='embedding of the name')
@@ -267,6 +303,20 @@ class EntityNode(Node):
         logger.debug(f'embedded {text} in {end - start} ms')
 
         return self.name_embedding
+
+    async def load_name_embedding(self, driver: AsyncDriver):
+        query: LiteralString = """
+            MATCH (n:Entity {uuid: $uuid})
+            RETURN n.name_embedding AS name_embedding
+        """
+        records, _, _ = await driver.execute_query(
+            query, uuid=self.uuid, database_=DEFAULT_DATABASE, routing_='r'
+        )
+
+        if len(records) == 0:
+            raise NodeNotFoundError(self.uuid)
+
+        self.name_embedding = records[0]['name_embedding']
 
     async def save(self, driver: AsyncDriver):
         entity_data: dict[str, Any] = {
@@ -293,19 +343,14 @@ class EntityNode(Node):
 
     @classmethod
     async def get_by_uuid(cls, driver: AsyncDriver, uuid: str):
-        records, _, _ = await driver.execute_query(
+        query = (
             """
-        MATCH (n:Entity {uuid: $uuid})
-        RETURN
-            n.uuid As uuid, 
-            n.name AS name,
-            n.name_embedding AS name_embedding,
-            n.group_id AS group_id,
-            n.created_at AS created_at, 
-            n.summary AS summary,
-            labels(n) AS labels,
-            properties(n) AS attributes
-        """,
+                                                        MATCH (n:Entity {uuid: $uuid})
+                                                        """
+            + ENTITY_NODE_RETURN
+        )
+        records, _, _ = await driver.execute_query(
+            query,
             uuid=uuid,
             database_=DEFAULT_DATABASE,
             routing_='r',
@@ -323,16 +368,8 @@ class EntityNode(Node):
         records, _, _ = await driver.execute_query(
             """
         MATCH (n:Entity) WHERE n.uuid IN $uuids
-        RETURN
-            n.uuid As uuid, 
-            n.name AS name,
-            n.name_embedding AS name_embedding,
-            n.group_id AS group_id,
-            n.created_at AS created_at, 
-            n.summary AS summary,
-            labels(n) AS labels,
-            properties(n) AS attributes
-        """,
+        """
+            + ENTITY_NODE_RETURN,
             uuids=uuids,
             database_=DEFAULT_DATABASE,
             routing_='r',
@@ -358,16 +395,8 @@ class EntityNode(Node):
         MATCH (n:Entity) WHERE n.group_id IN $group_ids
         """
             + cursor_query
+            + ENTITY_NODE_RETURN
             + """
-        RETURN
-            n.uuid As uuid, 
-            n.name AS name,
-            n.name_embedding AS name_embedding,
-            n.group_id AS group_id,
-            n.created_at AS created_at, 
-            n.summary AS summary,
-            labels(n) AS labels,
-            properties(n) AS attributes
         ORDER BY n.uuid DESC
         """
             + limit_query,
@@ -412,6 +441,20 @@ class CommunityNode(Node):
 
         return self.name_embedding
 
+    async def load_name_embedding(self, driver: AsyncDriver):
+        query: LiteralString = """
+            MATCH (c:Community {uuid: $uuid})
+            RETURN c.name_embedding AS name_embedding
+        """
+        records, _, _ = await driver.execute_query(
+            query, uuid=self.uuid, database_=DEFAULT_DATABASE, routing_='r'
+        )
+
+        if len(records) == 0:
+            raise NodeNotFoundError(self.uuid)
+
+        self.name_embedding = records[0]['name_embedding']
+
     @classmethod
     async def get_by_uuid(cls, driver: AsyncDriver, uuid: str):
         records, _, _ = await driver.execute_query(
@@ -420,7 +463,6 @@ class CommunityNode(Node):
         RETURN
             n.uuid As uuid, 
             n.name AS name,
-            n.name_embedding AS name_embedding,
             n.group_id AS group_id,
             n.created_at AS created_at, 
             n.summary AS summary
@@ -445,7 +487,6 @@ class CommunityNode(Node):
         RETURN
             n.uuid As uuid, 
             n.name AS name,
-            n.name_embedding AS name_embedding,
             n.group_id AS group_id,
             n.created_at AS created_at, 
             n.summary AS summary
@@ -479,7 +520,6 @@ class CommunityNode(Node):
         RETURN
             n.uuid As uuid, 
             n.name AS name,
-            n.name_embedding AS name_embedding,
             n.group_id AS group_id,
             n.created_at AS created_at, 
             n.summary AS summary
@@ -518,19 +558,18 @@ def get_entity_node_from_record(record: Any) -> EntityNode:
         uuid=record['uuid'],
         name=record['name'],
         group_id=record['group_id'],
-        name_embedding=record['name_embedding'],
         labels=record['labels'],
         created_at=record['created_at'].to_native(),
         summary=record['summary'],
         attributes=record['attributes'],
     )
 
-    del entity_node.attributes['uuid']
-    del entity_node.attributes['name']
-    del entity_node.attributes['group_id']
-    del entity_node.attributes['name_embedding']
-    del entity_node.attributes['summary']
-    del entity_node.attributes['created_at']
+    entity_node.attributes.pop('uuid', None)
+    entity_node.attributes.pop('name', None)
+    entity_node.attributes.pop('group_id', None)
+    entity_node.attributes.pop('name_embedding', None)
+    entity_node.attributes.pop('summary', None)
+    entity_node.attributes.pop('created_at', None)
 
     return entity_node
 
@@ -544,3 +583,9 @@ def get_community_node_from_record(record: Any) -> CommunityNode:
         created_at=record['created_at'].to_native(),
         summary=record['summary'],
     )
+
+
+async def create_entity_node_embeddings(embedder: EmbedderClient, nodes: list[EntityNode]):
+    name_embeddings = await embedder.create_batch([node.name for node in nodes])
+    for node, name_embedding in zip(nodes, name_embeddings, strict=True):
+        node.name_embedding = name_embedding

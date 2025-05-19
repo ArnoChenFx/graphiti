@@ -21,6 +21,30 @@ The Graphiti MCP server exposes the following key high-level functions of Graphi
 - **Group Management**: Organize and manage groups of related data with group_id filtering
 - **Graph Maintenance**: Clear the graph and rebuild indices
 
+## Quick Start for Claude Desktop, Cursor, and other clients
+
+1. Clone the Graphiti GitHub repo
+
+```bash
+git clone https://github.com/getzep/graphiti.git
+```
+
+or
+
+```bash
+gh repo clone getzep/graphiti
+```
+
+Note the full path to this directory.
+
+```
+cd graphiti && pwd
+```
+
+2. Install the [Graphiti prerequisites](#prerequisites).
+
+3. Configure Claude, Cursor, or other MCP client to use [Graphiti with a `stdio` transport](#integrating-with-mcp-clients). See the client documentation on where to find their MCP configuration files.
+
 ## Installation
 
 ### Prerequisites
@@ -52,6 +76,12 @@ The server uses the following environment variables:
 - `OPENAI_API_KEY`: OpenAI API key (required for LLM operations)
 - `OPENAI_BASE_URL`: Optional base URL for OpenAI API
 - `MODEL_NAME`: Optional model name to use for LLM inference
+- `AZURE_OPENAI_ENDPOINT`: Optional Azure OpenAI endpoint URL
+- `AZURE_OPENAI_DEPLOYMENT_NAME`: Optional Azure OpenAI deployment name
+- `AZURE_OPENAI_API_VERSION`: Optional Azure OpenAI API version
+- `AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME`: Optional Azure OpenAI embedding deployment name
+- `AZURE_OPENAI_EMBEDDING_API_VERSION`: Optional Azure OpenAI API version
+- `AZURE_OPENAI_USE_MANAGED_IDENTITY`: Optional use Azure Managed Identities for authentication
 
 You can set these variables in a `.env` file in the project directory.
 
@@ -66,7 +96,7 @@ uv run graphiti_mcp_server.py
 With options:
 
 ```bash
-uv run graphiti_mcp_server.py --model gpt-4o-mini --transport sse
+uv run graphiti_mcp_server.py --model gpt-4.1-mini --transport sse
 ```
 
 Available arguments:
@@ -88,25 +118,25 @@ Before running the Docker Compose setup, you need to configure the environment v
 
 1. **Using a .env file** (recommended):
 
-    - Copy the provided `.env.example` file to create a `.env` file:
-      ```bash
-      cp .env.example .env
-      ```
-    - Edit the `.env` file to set your OpenAI API key and other configuration options:
-      ```
-      # Required for LLM operations
-      OPENAI_API_KEY=your_openai_api_key_here
-      MODEL_NAME=gpt-4o-mini
-      # Optional: OPENAI_BASE_URL only needed for non-standard OpenAI endpoints
-      # OPENAI_BASE_URL=https://api.openai.com/v1
-      ```
-    - The Docker Compose setup is configured to use this file if it exists (it's optional)
+   - Copy the provided `.env.example` file to create a `.env` file:
+     ```bash
+     cp .env.example .env
+     ```
+   - Edit the `.env` file to set your OpenAI API key and other configuration options:
+     ```
+     # Required for LLM operations
+     OPENAI_API_KEY=your_openai_api_key_here
+     MODEL_NAME=gpt-4.1-mini
+     # Optional: OPENAI_BASE_URL only needed for non-standard OpenAI endpoints
+     # OPENAI_BASE_URL=https://api.openai.com/v1
+     ```
+   - The Docker Compose setup is configured to use this file if it exists (it's optional)
 
 2. **Using environment variables directly**:
-    - You can also set the environment variables when running the Docker Compose command:
-      ```bash
-      OPENAI_API_KEY=your_key MODEL_NAME=gpt-4o-mini docker compose up
-      ```
+   - You can also set the environment variables when running the Docker Compose command:
+     ```bash
+     OPENAI_API_KEY=your_key MODEL_NAME=gpt-4.1-mini docker compose up
+     ```
 
 #### Neo4j Configuration
 
@@ -145,24 +175,34 @@ This will start both the Neo4j database and the Graphiti MCP server. The Docker 
 
 To use the Graphiti MCP server with an MCP-compatible client, configure it to connect to the server:
 
+> [!IMPORTANT]
+> You will need the Python package manager, `uv` installed. Please refer to the [`uv` install instructions](https://docs.astral.sh/uv/getting-started/installation/).
+>
+> Ensure that you set the full path to the `uv` binary and your Graphiti project folder.
+
 ```json
 {
   "mcpServers": {
     "graphiti": {
       "transport": "stdio",
-      "command": "uv",
+      "command": "/Users/<user>/.local/bin/uv",
       "args": [
         "run",
-        "/ABSOLUTE/PATH/TO/graphiti_mcp_server.py",
+        "--isolated",
+        "--directory",
+        "/Users/<user>>/dev/zep/graphiti/mcp_server",
+        "--project",
+        ".",
+        "graphiti_mcp_server.py",
         "--transport",
         "stdio"
       ],
       "env": {
         "NEO4J_URI": "bolt://localhost:7687",
         "NEO4J_USER": "neo4j",
-        "NEO4J_PASSWORD": "demodemo",
-        "OPENAI_API_KEY": "${OPENAI_API_KEY}",
-        "MODEL_NAME": "gpt-4o-mini"
+        "NEO4J_PASSWORD": "password",
+        "OPENAI_API_KEY": "sk-XXXXXXXX",
+        "MODEL_NAME": "gpt-4.1-mini"
       }
     }
   }
@@ -177,31 +217,6 @@ For SSE transport (HTTP-based), you can use this configuration:
     "graphiti": {
       "transport": "sse",
       "url": "http://localhost:8000/sse"
-    }
-  }
-}
-```
-
-Or start the server with uv and connect to it:
-
-```json
-{
-  "mcpServers": {
-    "graphiti": {
-      "command": "uv",
-      "args": [
-        "run",
-        "/ABSOLUTE/PATH/TO/graphiti_mcp_server.py",
-        "--transport",
-        "sse"
-      ],
-      "env": {
-        "NEO4J_URI": "bolt://localhost:7687",
-        "NEO4J_USER": "neo4j",
-        "NEO4J_PASSWORD": "demodemo",
-        "OPENAI_API_KEY": "${OPENAI_API_KEY}",
-        "MODEL_NAME": "gpt-4o-mini"
-      }
     }
   }
 }
@@ -227,12 +242,14 @@ The Graphiti MCP server can process structured JSON data through the `add_episod
 allows you to automatically extract entities and relationships from structured data:
 
 ```
+
 add_episode(
-    name="Customer Profile",
-    episode_body="{\"company\": {\"name\": \"Acme Technologies\"}, \"products\": [{\"id\": \"P001\", \"name\": \"CloudSync\"}, {\"id\": \"P002\", \"name\": \"DataMiner\"}]}",
-    source="json",
-    source_description="CRM data"
+name="Customer Profile",
+episode_body="{\"company\": {\"name\": \"Acme Technologies\"}, \"products\": [{\"id\": \"P001\", \"name\": \"CloudSync\"}, {\"id\": \"P002\", \"name\": \"DataMiner\"}]}",
+source="json",
+source_description="CRM data"
 )
+
 ```
 
 ## Integrating with the Cursor IDE
