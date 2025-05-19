@@ -10,6 +10,11 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
+  build_and_start_svc:
+    uses: ./.github/workflows/build-and-start-svc.yml
+    permissions:
+      contents: read
+      id-token: write
   docker-image:
     needs: build_and_start_svc
     environment:
