@@ -17,7 +17,7 @@ limitations under the License.
 import logging
 from datetime import datetime
 from time import time
-from typing import Literal, Optional
+from typing import Literal
 
 from dotenv import load_dotenv
 from neo4j import AsyncGraphDatabase
@@ -562,10 +562,10 @@ class Graphiti:
         group_ids: list[str] | None = None,
         num_results=DEFAULT_SEARCH_LIMIT,
         search_filter: SearchFilters | None = None,
-        search_type:  Literal["similarity", "mmr"] = "similarity",
-        min_score: Optional[float] = None,
-        mmr_lambda: Optional[float] = None,
-        query_vector: Optional[list[float]] = None,
+        search_type: Literal['similarity', 'mmr'] = 'similarity',
+        min_score: float | None = None,
+        mmr_lambda: float | None = None,
+        query_vector: list[float] | None = None,
     ) -> list[EntityEdge]:
         """
         Perform a hybrid search on the knowledge graph.
@@ -614,7 +614,7 @@ class Graphiti:
                 search_config = EDGE_HYBRID_SEARCH_RRF.model_copy()
 
         search_config.limit = num_results
-        
+
         if min_score and search_config.edge_config:
             search_config.edge_config.sim_min_score = min_score
 
