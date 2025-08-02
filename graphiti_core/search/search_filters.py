@@ -19,7 +19,6 @@ from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
-from typing_extensions import LiteralString
 
 
 class ComparisonOperator(Enum):
@@ -42,6 +41,9 @@ class SearchFilters(BaseModel):
     node_labels: list[str] | None = Field(
         default=None, description='List of node labels to filter on'
     )
+    edge_types: list[str] | None = Field(
+        default=None, description='List of edge types to filter on'
+    )
     valid_at: list[list[DateFilter]] | None = Field(default=None)
     invalid_at: list[list[DateFilter]] | None = Field(default=None)
     created_at: list[list[DateFilter]] | None = Field(default=None)
@@ -50,8 +52,8 @@ class SearchFilters(BaseModel):
 
 def node_search_filter_query_constructor(
     filters: SearchFilters,
-) -> tuple[LiteralString, dict[str, Any]]:
-    filter_query: LiteralString = ''
+) -> tuple[str, dict[str, Any]]:
+    filter_query: str = ''
     filter_params: dict[str, Any] = {}
 
     if filters.node_labels is not None:
@@ -64,29 +66,40 @@ def node_search_filter_query_constructor(
 
 def edge_search_filter_query_constructor(
     filters: SearchFilters,
-) -> tuple[LiteralString, dict[str, Any]]:
-    filter_query: LiteralString = ''
+) -> tuple[str, dict[str, Any]]:
+    filter_query: str = ''
     filter_params: dict[str, Any] = {}
 
+    if filters.edge_types is not None:
+        edge_types = filters.edge_types
+        edge_types_filter = '\nAND e.name in $edge_types'
+        filter_query += edge_types_filter
+        filter_params['edge_types'] = edge_types
+
+    if filters.node_labels is not None:
+        node_labels = '|'.join(filters.node_labels)
+        node_label_filter = '\nAND n:' + node_labels + ' AND m:' + node_labels
+        filter_query += node_label_filter
+
     if filters.valid_at is not None:
-        valid_at_filter = ' AND ('
+        valid_at_filter = '\nAND ('
         for i, or_list in enumerate(filters.valid_at):
             for j, date_filter in enumerate(or_list):
                 filter_params['valid_at_' + str(j)] = date_filter.date
 
             and_filters = [
-                '(r.valid_at ' + date_filter.comparison_operator.value + f' $valid_at_{j})'
+                '(e.valid_at ' + date_filter.comparison_operator.value + f' $valid_at_{j})'
                 for j, date_filter in enumerate(or_list)
             ]
             and_filter_query = ''
             for j, and_filter in enumerate(and_filters):
                 and_filter_query += and_filter
-                if j != len(and_filter_query) - 1:
+                if j != len(and_filters) - 1:
                     and_filter_query += ' AND '
 
             valid_at_filter += and_filter_query
 
-            if i == len(or_list) - 1:
+            if i == len(filters.valid_at) - 1:
                 valid_at_filter += ')'
             else:
                 valid_at_filter += ' OR '
@@ -100,18 +113,18 @@ def edge_search_filter_query_constructor(
                 filter_params['invalid_at_' + str(j)] = date_filter.date
 
             and_filters = [
-                '(r.invalid_at ' + date_filter.comparison_operator.value + f' $invalid_at_{j})'
+                '(e.invalid_at ' + date_filter.comparison_operator.value + f' $invalid_at_{j})'
                 for j, date_filter in enumerate(or_list)
             ]
             and_filter_query = ''
             for j, and_filter in enumerate(and_filters):
                 and_filter_query += and_filter
-                if j != len(and_filter_query) - 1:
+                if j != len(and_filters) - 1:
                     and_filter_query += ' AND '
 
             invalid_at_filter += and_filter_query
 
-            if i == len(or_list) - 1:
+            if i == len(filters.invalid_at) - 1:
                 invalid_at_filter += ')'
             else:
                 invalid_at_filter += ' OR '
@@ -125,18 +138,18 @@ def edge_search_filter_query_constructor(
                 filter_params['created_at_' + str(j)] = date_filter.date
 
             and_filters = [
-                '(r.created_at ' + date_filter.comparison_operator.value + f' $created_at_{j})'
+                '(e.created_at ' + date_filter.comparison_operator.value + f' $created_at_{j})'
                 for j, date_filter in enumerate(or_list)
             ]
             and_filter_query = ''
             for j, and_filter in enumerate(and_filters):
                 and_filter_query += and_filter
-                if j != len(and_filter_query) - 1:
+                if j != len(and_filters) - 1:
                     and_filter_query += ' AND '
 
             created_at_filter += and_filter_query
 
-            if i == len(or_list) - 1:
+            if i == len(filters.created_at) - 1:
                 created_at_filter += ')'
             else:
                 created_at_filter += ' OR '
@@ -144,24 +157,24 @@ def edge_search_filter_query_constructor(
         filter_query += created_at_filter
 
     if filters.expired_at is not None:
-        expired_at_filter = 'AND ('
+        expired_at_filter = ' AND ('
         for i, or_list in enumerate(filters.expired_at):
             for j, date_filter in enumerate(or_list):
                 filter_params['expired_at_' + str(j)] = date_filter.date
 
             and_filters = [
-                '(r.expired_at ' + date_filter.comparison_operator.value + f' $expired_at_{j})'
+                '(e.expired_at ' + date_filter.comparison_operator.value + f' $expired_at_{j})'
                 for j, date_filter in enumerate(or_list)
             ]
             and_filter_query = ''
             for j, and_filter in enumerate(and_filters):
                 and_filter_query += and_filter
-                if j != len(and_filter_query) - 1:
+                if j != len(and_filters) - 1:
                     and_filter_query += ' AND '
 
             expired_at_filter += and_filter_query
 
-            if i == len(or_list) - 1:
+            if i == len(filters.expired_at) - 1:
                 expired_at_filter += ')'
             else:
                 expired_at_filter += ' OR '

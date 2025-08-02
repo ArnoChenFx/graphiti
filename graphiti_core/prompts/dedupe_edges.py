@@ -23,14 +23,15 @@ from .models import Message, PromptFunction, PromptVersion
 
 
 class EdgeDuplicate(BaseModel):
-    duplicate_fact_id: int = Field(
+    duplicate_facts: list[int] = Field(
         ...,
-        description='id of the duplicate fact. If no duplicate facts are found, default to -1.',
+        description='List of ids of any duplicate facts. If no duplicate facts are found, default to empty list.',
     )
     contradicted_facts: list[int] = Field(
         ...,
         description='List of ids of facts that should be invalidated. If no facts should be invalidated, the list should be empty.',
     )
+    fact_type: str = Field(..., description='One of the provided fact types or DEFAULT')
 
 
 class UniqueFact(BaseModel):
@@ -74,8 +75,9 @@ def edge(context: dict[str, Any]) -> list[Message]:
         </NEW EDGE>
         
         Task:
-        If the New Edges represents the same factual information as any edge in Existing Edges, return the id of the duplicate fact.
-        If the NEW EDGE is not a duplicate of any of the EXISTING EDGES, return -1.
+        If the New Edges represents the same factual information as any edge in Existing Edges, return the id of the duplicate fact
+            as part of the list of duplicate_facts.
+        If the NEW EDGE is not a duplicate of any of the EXISTING EDGES, return an empty list.
 
         Guidelines:
         1. The facts do not need to be completely identical to be duplicates, they just need to express the same information.
@@ -133,17 +135,26 @@ def resolve_edge(context: dict[str, Any]) -> list[Message]:
         {context['edge_invalidation_candidates']}
         </FACT INVALIDATION CANDIDATES>
         
+        <FACT TYPES>
+        {context['edge_types']}
+        </FACT TYPES>
+        
 
         Task:
-        If the NEW FACT represents the same factual information as any fact in EXISTING FACTS, return the idx of the duplicate fact.
-        If the NEW FACT is not a duplicate of any of the EXISTING FACTS, return -1.
+        If the NEW FACT represents identical factual information of one or more in EXISTING FACTS, return the idx of the duplicate facts.
+        Facts with similar information that contain key differences should not be marked as duplicates.
+        If the NEW FACT is not a duplicate of any of the EXISTING FACTS, return an empty list.
+        
+        Given the predefined FACT TYPES, determine if the NEW FACT should be classified as one of these types.
+        Return the fact type as fact_type or DEFAULT if NEW FACT is not one of the FACT TYPES.
         
         Based on the provided FACT INVALIDATION CANDIDATES and NEW FACT, determine which existing facts the new fact contradicts.
         Return a list containing all idx's of the facts that are contradicted by the NEW FACT.
         If there are no contradicted facts, return an empty list.
 
         Guidelines:
-        1. The facts do not need to be completely identical to be duplicates, they just need to express the same information.
+        1. Some facts may be very similar but will have key differences, particularly around numeric values in the facts.
+            Do not mark these facts as duplicates.
         """,
         ),
     ]
